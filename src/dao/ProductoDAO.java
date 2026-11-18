@@ -1,0 +1,130 @@
+package dao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import model.Producto;
+import util.Conexion;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ProductoDAO {
+
+public boolean guardar(Producto producto) {
+    String sqlId = "SELECT SEQ_PRODUCTOS.NEXTVAL FROM DUAL";
+    String sqlInsert = "INSERT INTO PRODUCTOS "
+            + "(ID_PRODUCTO, CODIGO, CATEGORIA, NOMBRE, PRECIO, EXISTENCIA, ACTIVO) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+    try (Connection cn = Conexion.conectar()) {
+        int idProducto;
+
+        try (PreparedStatement psId = cn.prepareStatement(sqlId);
+             ResultSet rs = psId.executeQuery()) {
+            if (!rs.next()) {
+                return false;
+            }
+            idProducto = rs.getInt(1);
+        }
+
+        String codigo = "PROD" + String.format("%03d", idProducto);
+
+        try (PreparedStatement ps = cn.prepareStatement(sqlInsert)) {
+            ps.setInt(1, idProducto);
+            ps.setString(2, codigo);
+            ps.setString(3, producto.getCategoria());
+            ps.setString(4, producto.getNombre());
+            ps.setDouble(5, producto.getPrecio());
+            ps.setInt(6, producto.getExistencia());
+            ps.setInt(7, producto.isActivo() ? 1 : 0);
+
+            return ps.executeUpdate() > 0;
+        }
+
+    } catch (Exception e) {
+        System.out.println("Error al guardar producto: " + e.getMessage());
+        return false;
+    }
+}
+    
+public List<Producto> listar() {
+    List<Producto> productos = new ArrayList<>();
+
+    String sql = "SELECT P.ID_PRODUCTO, P.CODIGO, P.CATEGORIA, "
+               + "P.NOMBRE, P.PRECIO, P.EXISTENCIA, NVL(C.TIPO, 'EXTRA') TIPO "
+               + "FROM PRODUCTOS P "
+               + "LEFT JOIN CATEGORIAS C ON C.NOMBRE = P.CATEGORIA "
+               + "WHERE P.ACTIVO = 1 "
+               + "ORDER BY P.ID_PRODUCTO";
+
+    try (Connection cn = Conexion.conectar();
+         PreparedStatement ps = cn.prepareStatement(sql);
+         ResultSet rs = ps.executeQuery()) {
+
+        while (rs.next()) {
+            Producto producto = new Producto(
+                rs.getInt("ID_PRODUCTO"),
+                rs.getString("CODIGO"),
+                rs.getString("CATEGORIA"),
+                rs.getString("NOMBRE"),
+                rs.getDouble("PRECIO"),
+                rs.getInt("EXISTENCIA")
+            );
+            producto.setTipoCategoria(rs.getString("TIPO"));
+
+            productos.add(producto);
+        }
+
+    } catch (Exception e) {
+        System.out.println(
+            "Error al listar productos: " + e.getMessage()
+        );
+    }
+
+    return productos;
+}
+
+public boolean actualizar(Producto producto) {
+    String sql = "UPDATE PRODUCTOS "
+               + "SET CODIGO = ?, CATEGORIA = ?, NOMBRE = ?, "
+               + "PRECIO = ?, EXISTENCIA = ? "
+               + "WHERE ID_PRODUCTO = ? AND ACTIVO = 1";
+
+    try (Connection cn = Conexion.conectar();
+         PreparedStatement ps = cn.prepareStatement(sql)) {
+
+        ps.setString(1, producto.getCodigo());
+        ps.setString(2, producto.getCategoria());
+        ps.setString(3, producto.getNombre());
+        ps.setDouble(4, producto.getPrecio());
+        ps.setInt(5, producto.getExistencia());
+        ps.setInt(6, producto.getIdProducto());
+
+        return ps.executeUpdate() > 0;
+
+    } catch (Exception e) {
+        System.out.println("Error al actualizar producto: " + e.getMessage());
+        return false;
+    }
+}
+
+public boolean desactivar(int idProducto) {
+    String sql = "UPDATE PRODUCTOS SET ACTIVO = 0 "
+               + "WHERE ID_PRODUCTO = ? AND ACTIVO = 1";
+
+    try (Connection cn = Conexion.conectar();
+         PreparedStatement ps = cn.prepareStatement(sql)) {
+
+        ps.setInt(1, idProducto);
+
+        return ps.executeUpdate() > 0;
+
+    } catch (Exception e) {
+        System.out.println(
+            "Error al desactivar producto: " + e.getMessage()
+        );
+        return false;
+    }
+   }
+
+}
